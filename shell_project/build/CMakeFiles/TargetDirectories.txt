@@ -1,0 +1,4 @@
+/Users/larsmaas/Documents/School/OS-concepts/project1-main/build/CMakeFiles/shelllib.dir
+/Users/larsmaas/Documents/School/OS-concepts/project1-main/build/CMakeFiles/shell.dir
+/Users/larsmaas/Documents/School/OS-concepts/project1-main/build/CMakeFiles/edit_cache.dir
+/Users/larsmaas/Documents/School/OS-concepts/project1-main/build/CMakeFiles/rebuild_cache.dir
