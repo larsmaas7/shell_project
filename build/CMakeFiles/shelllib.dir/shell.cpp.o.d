@@ -1,5 +1,5 @@
 CMakeFiles/shelllib.dir/shell.cpp.o: \
-  /Users/larsmaas/Documents/School/OS-concepts/project1-main/shell.cpp \
+  /Users/larsmaas/Documents/School/OS-concepts/shell_project/shell.cpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__assert \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config \
