@@ -151,6 +151,21 @@ int execute_expression(Expression& expression) {
     return EINVAL;
 
   // Handle intern commands (like 'cd' and 'exit')
+  if (expression.commands.size() == 1) {
+      const vector<string>& args = expression.commands[0].parts;
+      if (args.empty()) return 0;
+
+      // exit
+      if (args[0] == "exit") {
+        exit(0);
+      }
+
+      //cd
+      if(args[0] == "cd") {
+        //TODO!!!!!!!!!!!!
+        exit(0);
+      }
+  }
   
   // External commands, executed with fork():
   // Loop over all commandos, and connect the output and input of the forked processes
@@ -165,29 +180,54 @@ int execute_expression(Expression& expression) {
 // two processes are created, and connected to each other
 int step1(bool showPrompt) {
   // create communication channel shared between the two processes
-  // ...
+  // pipef[0] is the read end, pipef[1] is the write end
+  int pipef[2];
+  if(pipe(pipef) < 0) {
+    perror("pipe step1 failed");
+    return errno;
+  }
 
   pid_t child1 = fork();
   if (child1 == 0) {
     // redirect standard output (STDOUT_FILENO) to the input of the shared communication channel
+    dup2(pipef[1], STDOUT_FILENO);
     // free non used resources (why?)
+    // because otherwise child1 holds unused read/write ends open.
+    close(pipef[0]);
+    close(pipef[1]);
+
     Command cmd = {{string("date")}};
     execute_command(cmd);
     // display nice warning that the executable could not be found
+    cerr << "Error: did not execute date from step1: " << strerror(errno) << endl;
     abort(); // if the executable is not found, we should abort. (why?)
+    //because we need to kill the child process, otherwise it will keep going and execute
+    //the code below here, meaning that it will behave as it's parent.
   }
+
 
   pid_t child2 = fork();
   if (child2 == 0) {
     // redirect the output of the shared communication channel to the standard input (STDIN_FILENO).
+    dup2(pipef[0], STDIN_FILENO);
     // free non used resources (why?)
+    // because otherwise child2 holds unused read/write ends open.
+    close(pipef[0]);
+    close(pipef[1]);
+
     Command cmd = {{string("tail"), string("-c"), string("5")}};
     execute_command(cmd);
+    cerr << "Error: did not execute tail from step1: " << strerror(errno) << endl;
     abort(); // if the executable is not found, we should abort. (why?)
   }
 
   // free non used resources (why?)
+  // because if pipef[1] stays open, the tail will never see the EOF and the progam will keep hanging.
+  close(pipef[0]);
+  close(pipef[1]);
   // wait on child processes to finish (why both?)
+  //because otherwise the process keeps alive in case the parent asks for the wait() later.
+  //meaning that even though the process is done, it is kept alive. so called "zombie processes"
   waitpid(child1, nullptr, 0);
   waitpid(child2, nullptr, 0);
   return 0;
