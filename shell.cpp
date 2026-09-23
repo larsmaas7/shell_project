@@ -330,8 +330,6 @@ int step1(bool showPrompt) {
 int shell(bool showPrompt) {
   //* <- remove one '/' in front of the other '/' to switch from the normal code to step1 code
   while (cin.good()) {
-    while (waitpid(-1, nullptr, WNOHANG) > 0);
-    
     string commandLine = request_command_line(showPrompt);
     Expression expression = parse_command_line(commandLine);
     int rc = execute_expression(expression);
