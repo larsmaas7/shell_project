@@ -155,15 +155,21 @@ int execute_expression(Expression& expression) {
       const vector<string>& args = expression.commands[0].parts;
       if (args.empty()) return 0;
 
-      // exit
+      //exit
       if (args[0] == "exit") {
         exit(0);
       }
 
       //cd
       if(args[0] == "cd") {
-        //TODO!!!!!!!!!!!!
-        exit(0);
+        if (args.size() < 2) {
+          cerr << "cd: missing argument" << endl;
+          return EINVAL;
+        }
+        if(chdir(args[1].c_str()) != 0) {
+          return errno; // Return errno on failure (e.g. directory not found)
+        }
+        return 0;
       }
   }
   
@@ -171,7 +177,95 @@ int execute_expression(Expression& expression) {
   // Loop over all commandos, and connect the output and input of the forked processes
 
   // For now, we just execute the first command in the expression. Disable.
-  execute_command(expression.commands[0]);
+  //execute_command(expression.commands[0]);
+
+  int prev_pipe_read = -1;
+  size_t command_count = expression.commands.size();
+  vector<pid_t> pids;
+
+  for(size_t i = 0; i < command_count; i++) {
+    int pipefd[2];
+
+    //create the pipe
+    if(i < command_count - 1) {
+      pipe(pipefd);
+    }
+
+
+    pid_t pid = fork();
+
+    if(pid == 0) {
+//child process
+      
+      if(i == 0) {
+        if(!expression.inputFromFile.empty()) {
+          int in_fd = open(expression.inputFromFile.c_str(), O_RDONLY);
+          if(in_fd < 0) {
+              cerr << "Error opening input file: " << strerror(errno) << endl;
+              exit(errno);
+          }
+          dup2(in_fd, STDIN_FILENO);
+          close(in_fd);
+        }
+        //background processes have no direct user input available
+        else if(expression.background && prev_pipe_read == -1) {
+          int devnull = open("/dev/null", O_RDONLY);
+          if(devnull != -1) {
+            dup2(devnull, STDIN_FILENO);
+            close(devnull);
+          }
+        }
+      }
+
+      //connect command input to last pipe read end, only if this is not the first command
+      else if(prev_pipe_read != -1) {
+        dup2(prev_pipe_read, STDIN_FILENO);
+        close(prev_pipe_read);
+      }
+      //connects command output to pipe read end, only if this is not the last command
+      if(i < command_count - 1) {
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[0]);
+        close(pipefd[1]);
+      }
+      //write to file if given
+      else if(!expression.outputToFile.empty()) {
+        int out_fd = open(expression.outputToFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if(out_fd < 0) {
+          cerr << "Error opening output file: " << strerror(errno) << endl;
+          exit(errno);
+        }
+        dup2(out_fd, STDOUT_FILENO);
+        close(out_fd);
+      }
+
+      //execute command
+      execute_command(expression.commands[i]);
+      cerr << "Failed to execute command: " << strerror(errno) << endl;
+      exit(1);
+
+    } else if(pid > 0) {
+//parent process
+      pids.push_back(pid);
+      if(prev_pipe_read != -1) {
+        close(prev_pipe_read);
+      }
+      if(i < command_count -1) {
+        close(pipefd[1]);
+        prev_pipe_read = pipefd[0];
+      }
+
+    }
+  }
+
+
+
+  if(!expression.background) {
+    for(pid_t pid : pids) {
+      waitpid(pid, nullptr, 0);
+    }
+  }
+
 
   return 0;
 }
@@ -180,9 +274,9 @@ int execute_expression(Expression& expression) {
 // two processes are created, and connected to each other
 int step1(bool showPrompt) {
   // create communication channel shared between the two processes
-  // pipef[0] is the read end, pipef[1] is the write end
-  int pipef[2];
-  if(pipe(pipef) < 0) {
+  // pipefd[0] is the read end, pipefd[1] is the write end
+  int pipefd[2];
+  if(pipe(pipefd) < 0) {
     perror("pipe step1 failed");
     return errno;
   }
@@ -190,17 +284,17 @@ int step1(bool showPrompt) {
   pid_t child1 = fork();
   if (child1 == 0) {
     // redirect standard output (STDOUT_FILENO) to the input of the shared communication channel
-    dup2(pipef[1], STDOUT_FILENO);
+    dup2(pipefd[1], STDOUT_FILENO);
     // free non used resources (why?)
     // because otherwise child1 holds unused read/write ends open.
-    close(pipef[0]);
-    close(pipef[1]);
+    close(pipefd[0]);
+    close(pipefd[1]);
 
     Command cmd = {{string("date")}};
     execute_command(cmd);
     // display nice warning that the executable could not be found
     cerr << "Error: did not execute date from step1: " << strerror(errno) << endl;
-    abort(); // if the executable is not found, we should abort. (why?)
+    exit(1); // if the executable is not found, we should abort. (why?)
     //because we need to kill the child process, otherwise it will keep going and execute
     //the code below here, meaning that it will behave as it's parent.
   }
@@ -209,22 +303,22 @@ int step1(bool showPrompt) {
   pid_t child2 = fork();
   if (child2 == 0) {
     // redirect the output of the shared communication channel to the standard input (STDIN_FILENO).
-    dup2(pipef[0], STDIN_FILENO);
+    dup2(pipefd[0], STDIN_FILENO);
     // free non used resources (why?)
     // because otherwise child2 holds unused read/write ends open.
-    close(pipef[0]);
-    close(pipef[1]);
+    close(pipefd[0]);
+    close(pipefd[1]);
 
     Command cmd = {{string("tail"), string("-c"), string("5")}};
     execute_command(cmd);
     cerr << "Error: did not execute tail from step1: " << strerror(errno) << endl;
-    abort(); // if the executable is not found, we should abort. (why?)
+    exit(1); // if the executable is not found, we should abort. (why?)
   }
 
   // free non used resources (why?)
-  // because if pipef[1] stays open, the tail will never see the EOF and the progam will keep hanging.
-  close(pipef[0]);
-  close(pipef[1]);
+  // because if pipefd[1] stays open, the tail will never see the EOF and the progam will keep hanging.
+  close(pipefd[0]);
+  close(pipefd[1]);
   // wait on child processes to finish (why both?)
   //because otherwise the process keeps alive in case the parent asks for the wait() later.
   //meaning that even though the process is done, it is kept alive. so called "zombie processes"
@@ -236,6 +330,8 @@ int step1(bool showPrompt) {
 int shell(bool showPrompt) {
   //* <- remove one '/' in front of the other '/' to switch from the normal code to step1 code
   while (cin.good()) {
+    while (waitpid(-1, nullptr, WNOHANG) > 0);
+    
     string commandLine = request_command_line(showPrompt);
     Expression expression = parse_command_line(commandLine);
     int rc = execute_expression(expression);

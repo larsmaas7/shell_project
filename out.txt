@@ -1,0 +1,37 @@
+1 Report shell project Operating Systems Concepts
+2
+3 Names & and student numbers: Lars Maas (s1165354) & Jayden Snijder (s116...)
+4
+5 Your report should be in .pdf, and it should contain your names and student numbers.
+6 In addition, the following sections are required.
+7
+8 1. Implementation (max 1 A4)
+9
+10 Describe your implementation. Mention how the code traverses the Expression data structure, clearly
+11 indicating when pipe(), fork(), and waitpid() are called (8pt).
+12
+13 Provide a list of system calls used by your solution and why/how your program uses them (12pt).
+14
+15 2. Tests (max 1 A4)
+16
+17 We expect you to test your shell. Unit tests or a testing framework is not required, and it is sufficient
+18 if you just try some commands by hand. Mention the commands you tested. One way to do that, is by making
+19 a table with the following columns (10pt, 1pt per test, should have proper coverage):
+20
+21 command | expected result | actual result
+22---------------------------------------------
+23 | |
+24
+25 Given your tests, are you sure your shell does function correctly? Make a distinction between:
+26 errors (problems in human), faults (problems in code), failure (problems in execution). (5pt)
+27
+28 Given _any_ tests, can you be sure your shell does function correctly, and handles all edge cases
+29 correctly (such as out of memory)? (5pt)
+30
+31 3. Infinite buffer problem (max 1/2 A4)
+32
+33 Explain why infinite buffers are not possible for a communication channel in an operating system, and how an operating
+34
+35 Does your implementation potentially need an infinite buffer for the communication channels
+36 between chained commands? Explain why (not), and why your chained commands will terminate properly
+37 (if all the subcommands execute correctly). Does the place of waitpid() have an influence on this? (5pt)
