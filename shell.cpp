@@ -6,7 +6,7 @@
 
 	Student names:
 	- Lars Maas
-	- Jayden Snijders
+	- Jayden Snijder
 */
 
 /**
